@@ -1,0 +1,349 @@
+import React, { useState, useEffect } from 'react';
+
+// === CONFIGURACIÓN DE CONEXIÓN CON MAKE ===
+const WEBHOOK_CONFIG = {
+  url: "https://hook.us1.make.com/zhu4lqzj629yh59ojch21ucmh6km1huh",
+  token: "sheets_2026_plataforma_educativa"
+};
+
+const MAX_SCORE = 5000;
+
+// === DATOS DE LOS 5 DILEMAS POLÍTICOS ===
+const NPCs_DATA = [
+  {
+    id: 1, name: "Solón", x: 20, y: 30, color: "bg-red-400",
+    image: "https://via.placeholder.com/150/ff8888/ffffff?text=Solon", // REEMPLAZAR URL
+    dialogues: [
+      "¡Saludos, joven! Soy Solón. Atenas se ahoga en deudas. Los campesinos están perdiendo sus tierras e incluso su libertad frente a los nobles aristócratas.",
+      "Como legislador, mi dilema es la Seisactía: ¿Debemos perdonar todas las deudas de tierras y liberar a los esclavos por deuda, o respetar la propiedad y los contratos de los nobles?"
+    ],
+    options: [
+      { text: "Apoyar la Seisactía: Perdón total y libertad. (Justicia social)", points: 1000, feedback: "¡Excelente! Solón implementó esto, creando las bases de la clase ciudadana ateniense." },
+      { text: "Mantener los contratos: Las deudas deben pagarse. (Respeto a la propiedad)", points: 200, feedback: "Solón consideró que esto mantendría la injusticia y la inestabilidad. Te da pocos puntos." },
+      { text: "Una solución media: Solo perdonar una parte. (Compromiso)", points: 600, feedback: "Un buen intento, pero Solón tomó una medida radical para salvar la ciudad." }
+    ]
+  },
+  {
+    id: 2, name: "Clístenes", x: 70, y: 25, color: "bg-blue-400",
+    image: "https://via.placeholder.com/150/8888ff/ffffff?text=Clistenes", // REEMPLAZAR URL
+    dialogues: [
+      "Hola. Soy Clístenes. He reformado Atenas para que la tiranía no vuelva jamás. Ahora, ¿cómo deberíamos organizar a los ciudadanos para evitar que los ricos controlen la política de sus regiones?"
+    ],
+    options: [
+      { text: "Agruparlos por tribus antiguas basadas en la familia. (Tradición)", points: 200, feedback: "Eso mantendría el poder de las familias aristocráticas. Clístenes hizo lo contrario." },
+      { text: "Agruparlos en 10 nuevas tribus, mezclando gente de costa, ciudad e interior. (Isonomía)", points: 1000, feedback: "¡Correcto! Clístenes rompió los antiguos lazos de poder regional con esta mezcla." },
+      { text: "Dejar que se organicen como quieran. (Libertad)", points: 400, feedback: "Eso causaría caos y no resolvería el problema del poder regional." }
+    ]
+  },
+  {
+    id: 3, name: "Pericles", x: 50, y: 60, color: "bg-green-400",
+    image: "https://via.placeholder.com/150/88ff88/ffffff?text=Pericles", // REEMPLAZAR URL
+    dialogues: [
+      "¡Ciudadano! Soy Pericles. Nuestra democracia está en su apogeo. Pero la participación de los ciudadanos más pobres en la política es baja porque no pueden permitirse perder un día de trabajo.",
+      "Para que la democracia sea verdadera, ¿debemos pagar un salario (Mysthos) a los ciudadanos por asistir a la Asamblea o ser jurados?"
+    ],
+    options: [
+      { text: "¡Sí! Pagar salario para garantizar participación. (Democracia radical)", points: 1000, feedback: "¡Exacto! Mi gran reforma permitió que incluso los 'Thetes' (pobres) participaran activamente." },
+      { text: "No, la participación debe ser un deber cívico, no un trabajo. (Tradición)", points: 300, feedback: "Esto limitaría el poder de la democracia a los que tienen tiempo y dinero." },
+      { text: "Solo pagar si el ciudadano demuestra pobreza. (Asistencia focalizada)", points: 700, feedback: "Bueno, pero esto crearía burocracia y distinciones sociales dentro de la Ekklesía." }
+    ]
+  },
+  {
+    id: 4, name: "Eucrates", x: 25, y: 75, color: "bg-purple-400",
+    image: "https://via.placeholder.com/150/aa88ff/ffffff?text=Eucrates", // REEMPLAZAR URL
+    dialogues: [
+      "Soy Eucrates, un orador de la Ekklesía. Acabamos de promulgar una ley de defensa naval con urgencia, pero sospecho que el orador que la propuso violó una ley anterior sobre la construcción de barcos.",
+      "El orador actuó por el bien de la ciudad, pero violó el procedimiento legal. ¿Qué debo hacer?"
+    ],
+    options: [
+      { text: "Denunciarlo por violar el procedimiento legal. (Respeto a la Ley/Nómos)", points: 1000, feedback: "¡Bien! En Atenas, la 'Graphe Paranomon' castigaba a quien propusiera leyes ilegales, incluso si eran populares." },
+      { text: "Ignorarlo, el resultado final fue bueno. (Pragmatismo)", points: 100, feedback: "Esto debilita el estado de derecho, base de la democracia ateniense." },
+      { text: "Pedir que se cree una nueva comisión para investigar. (Burocracia)", points: 600, feedback: "Es una opción, pero la justicia ateniense requería acción ciudadana directa." }
+    ]
+  },
+  {
+    id: 5, name: "La Asamblea", x: 80, y: 70, color: "bg-yellow-400",
+    image: "https://via.placeholder.com/150/ffff88/000000?text=Ekklesia", // REEMPLAZAR URL
+    dialogues: [
+      "Te encuentras ante la Asamblea en la colina Pnyx. La guerra está cerca y debemos decidir nuestro plan.",
+      "¿Deberíamos usar la retórica para persuadir a la multitud con argumentos emocionales y populares, o usar la lógica (Lógos) y la ética (Ethos) aunque el mensaje sea difícil?"
+    ],
+    options: [
+      { text: "Argumentar con Lógica (Lógos) y Ética (Ethos). (Política filosófica)", points: 1000, feedback: "¡Excelente! Los sofistas enseñaban a persuadir con demagogia, pero la verdadera política busca la verdad." },
+      { text: "Usa la Retórica para prometer victorias fáciles. (Demagogia)", points: 200, feedback: "Esto es lo que hacían los demagogos, llevando a menudo a la ciudad a decisiones desastrosas." },
+      { text: "Presentar solo los hechos fríos sin persuadir. (Objetividad)", points: 700, feedback: "Está bien, pero en la democracia ateniense, la persuasión ética era clave para la acción cívica." }
+    ]
+  }
+];
+
+function App() {
+  const [playerPos, setPlayerPos] = useState({ x: 50, y: 50 });
+  const [currentNPC, setCurrentNPC] = useState(null);
+  const [score, setScore] = useState(0);
+  const [answeredNPCs, setAnsweredNPCs] = useState([]);
+  const [gamePhase, setGamePhase] = useState('explorando'); // explorando, dialogando, final, enviando, exito, error
+  
+  // Datos del estudiante para el envío
+  const [studentData, setStudentData] = useState({ curso: "11-1", documento: "" });
+  const [errorMessage, setErrorMessage] = useState("");
+
+  // Controlar movimiento por teclado
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (gamePhase !== 'explorando') return;
+      let { x, y } = playerPos;
+      const step = 5;
+      if (e.key === 'ArrowUp') y = Math.max(0, y - step);
+      if (e.key === 'ArrowDown') y = Math.min(100, y + step);
+      if (e.key === 'ArrowLeft') x = Math.max(0, x - step);
+      if (e.key === 'ArrowRight') x = Math.min(100, x + step);
+      setPlayerPos({ x, y });
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [playerPos, gamePhase]);
+
+  // Detección de colisión con NPCs
+  useEffect(() => {
+    if (gamePhase !== 'explorando') return;
+    const npc = NPCs_DATA.find(n => 
+      !answeredNPCs.includes(n.id) && 
+      Math.abs(n.x - playerPos.x) < 8 && 
+      Math.abs(n.y - playerPos.y) < 8
+    );
+    if (npc) {
+      setCurrentNPC(npc);
+      setGamePhase('dialogando');
+    }
+  }, [playerPos, answeredNPCs, gamePhase]);
+
+  // Verificar fin del juego
+  useEffect(() => {
+    if (answeredNPCs.length === NPCs_DATA.length && gamePhase === 'explorando') {
+      setGamePhase('final');
+    }
+  }, [answeredNPCs, gamePhase]);
+
+  const handleAnswer = (points) => {
+    setScore(prev => prev + points);
+    setAnsweredNPCs(prev => [...prev, currentNPC.id]);
+    setGamePhase('explorando');
+    setCurrentNPC(null);
+  };
+
+  // === FÓRMULA DE CONVERSIÓN DE NOTA ===
+  // Convierte 0-5000 puntos a escala 1.0-5.0
+  const calculateFinalGrade = (currentScore) => {
+    // Escala (min-max) -> (1.0 - 5.0)
+    // nota = ((score / MAX_SCORE) * (MaxNota - MinNota)) + MinNota
+    const grade = ((currentScore / MAX_SCORE) * (5 - 1)) + 1;
+    return parseFloat(grade.toFixed(2));
+  };
+
+  const finalGrade = calculateFinalGrade(score);
+
+  // === ENVÍO DE NOTA A MAKE ===
+  const submitGrade = async () => {
+    if (!studentData.documento) {
+      alert("Por favor ingrese su número de documento.");
+      return;
+    }
+    setGamePhase('enviando');
+    setErrorMessage("");
+
+    const payload = {
+      token: WEBHOOK_CONFIG.token,
+      curso: studentData.curso,
+      documento: studentData.documento,
+      nota: finalGrade
+    };
+
+    try {
+      const response = await fetch(WEBHOOK_CONFIG.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        setGamePhase('exito');
+      } else {
+        const errorData = await response.json();
+        setErrorMessage(errorData.mensaje || "Error desconocido al registrar la nota.");
+        setGamePhase('error');
+      }
+    } catch (error) {
+      setErrorMessage("Error de conexión con el servidor. Intente más tarde.");
+      setGamePhase('error');
+    }
+  };
+
+  // Botones de movimiento para celular
+  const MoveButton = ({ direction, dx, dy }) => (
+    <button 
+      onClick={() => setPlayerPos(prev => ({
+        x: Math.max(0, Math.min(100, prev.x + dx * 10)),
+        y: Math.max(0, Math.min(100, prev.y + dy * 10))
+      }))}
+      className="bg-stone-700/70 text-white font-bold p-4 rounded-full active:bg-stone-900"
+    >
+      {direction}
+    </button>
+  );
+
+  return (
+    <div className="w-full h-screen bg-stone-100 flex flex-col font-serif overflow-hidden">
+      {/* HEADER */}
+      <header className="bg-stone-900 text-amber-100 p-4 shadow-lg flex justify-between items-center z-10">
+        <h1 className="text-2xl font-bold tracking-widest flex items-center gap-2">🏛️ ATENAS QUEST: EL ORIGEN DE LA DEMOCRACIA</h1>
+        <div className="flex gap-4 text-sm font-sans">
+          <div className="bg-amber-100/10 p-2 rounded">Puntuación: <span className="font-bold text-amber-300">{score} / {MAX_SCORE}</span></div>
+          <div className="bg-amber-100/10 p-2 rounded">Dilemas: <span className="font-bold text-amber-300">{answeredNPCs.length} / {NPCs_DATA.length}</span></div>
+        </div>
+      </header>
+
+      {/* ÁREA DE JUEGO O MODALES */}
+      <main className="flex-grow relative bg-stone-200 p-2 md:p-6 flex flex-col items-center">
+        
+        {/* FASE: EXPLORANDO (MAPA INTERACTIVO) */}
+        {gamePhase === 'explorando' && (
+          <>
+            <div className="w-full max-w-5xl h-3/4 bg-stone-50 border-4 border-double border-stone-800 rounded-lg relative overflow-hidden shadow-inner">
+              {/* === IMAGEN DE FONDO DEL MAPA (Reemplazar URL) === */}
+              <div className="absolute inset-0 opacity-40 flex items-center justify-center font-bold text-6xl text-stone-300">
+                AQUÍ VA EL MAPA DEL ÁGORA 🗺️
+              </div>
+              <img 
+                src="https://via.placeholder.com/1200x800/e7e5e4/44403c?text=IMAGEN_DEL_MAPA_AQUI" // REEMPLAZAR URL
+                alt="Mapa de Atenas"
+                className="absolute inset-0 w-full h-full object-cover hidden"
+              />
+
+              {/* NPCs */}
+              {NPCs_DATA.map(npc => (
+                <div key={npc.id} className={`absolute flex flex-col items-center transition-opacity duration-300 ${answeredNPCs.includes(npc.id) ? 'opacity-30' : 'opacity-100'}`} style={{ left: `${npc.x}%`, top: `${npc.y}%` }}>
+                  <div className={`w-12 h-12 ${npc.color} rounded-full border-2 border-stone-900 shadow-lg flex items-center justify-center text-xs font-bold text-white`}>🏛️</div>
+                  <span className="text-xs bg-white/70 px-1 rounded font-sans font-bold">{npc.name}</span>
+                </div>
+              ))}
+
+              {/* EL JUGADOR (AVATAR) */}
+              <div className="absolute w-8 h-8 flex items-center justify-center transition-all duration-150 ease-linear" style={{ left: `${playerPos.x}%`, top: `${playerPos.y}%`, transform: 'translate(-50%, -50%)' }}>
+                <div className="w-6 h-6 bg-red-600 rounded-full border-4 border-stone-900 shadow-xl animate-pulse"></div>
+                <div className="absolute -bottom-4 text-xs bg-black text-white px-1 rounded">TÚ</div>
+              </div>
+            </div>
+
+            {/* CONTROLES PARA CELULAR */}
+            <div className="grid grid-cols-3 gap-2 mt-4 p-2 bg-stone-300/50 rounded-xl md:hidden">
+              <div/> <MoveButton direction="↑" dx={0} dy={-1} /> <div/>
+              <MoveButton direction="←" dx={-1} dy={0} /> <MoveButton direction="↓" dx={0} dy={1} /> <MoveButton direction="→" dx={1} dy={0} />
+            </div>
+            <div className="hidden md:block mt-2 text-stone-600 italic">Usa las flechas del teclado ⬆️ ⬇️ ⬅️ ➡️ para moverte por el Ágora.</div>
+          </>
+        )}
+
+        {/* FASE: DIALOGANDO (MODAL DE RETO) */}
+        {gamePhase === 'dialogando' && currentNPC && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-amber-50 border-4 border-amber-900 rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-2xl p-6 md:p-10 flex flex-col md:flex-row gap-6 md:gap-10 overflow-y-auto">
+              {/* Imagen del Personaje */}
+              <div className="w-full md:w-1/3 flex flex-col items-center">
+                <img 
+                  src={currentNPC.image} // USANDO URL O PLACEHOLDER
+                  alt={currentNPC.name} 
+                  className="w-48 h-48 rounded-full border-8 border-amber-900 object-cover shadow-lg"
+                />
+                <h2 className="text-3xl font-bold mt-4 text-amber-950 tracking-wide">{currentNPC.name}</h2>
+                <p className="text-sm italic text-amber-800">Legislador ateniense</p>
+              </div>
+              
+              {/* Diálogo y Opciones */}
+              <div className="w-full md:w-2/3 flex flex-col justify-between">
+                <div className="bg-amber-100 p-6 rounded-xl border border-amber-300 shadow-inner mb-6">
+                  {currentNPC.dialogues.map((d, i) => <p key={i} className="text-amber-950 text-lg mb-4 leading-relaxed">{d}</p>)}
+                </div>
+                
+                <div className="flex flex-col gap-4">
+                  <h3 className="text-xl font-bold text-amber-950 mb-2">💡 ¿Qué decisión es mejor para la democracia ateniense?</h3>
+                  {currentNPC.options.map((opt, i) => (
+                    <button key={i} onClick={() => handleAnswer(opt.points)} className="bg-amber-900 hover:bg-amber-800 text-amber-50 text-left p-5 rounded-xl font-semibold shadow-md transition-colors active:scale-95 flex items-center gap-3">
+                      <span className="text-2xl text-amber-300">🏛️</span>
+                      {opt.text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* FASE: FINAL (RECUPERAR DATOS Y NOTA) */}
+        {gamePhase === 'final' && (
+          <div className="bg-amber-50 border-8 border-amber-950 rounded-3xl w-full max-w-3xl shadow-2xl p-10 flex flex-col items-center text-center">
+            <h2 className="text-5xl font-bold text-amber-950 tracking-tighter mb-6">🏛️ ¡MISIÓN CUMPLIDA, CIUDADANO! 🏛️</h2>
+            <p className="text-amber-900 text-xl max-w-xl mb-10 leading-relaxed">Has enfrentado los dilemas más profundos que forjaron la democracia ateniense. Es hora de enviar tu nota a la planilla del Profe Danny.</p>
+            
+            <div className="bg-white p-8 rounded-2xl border-4 border-stone-800 shadow-xl mb-10 w-full flex flex-col items-center">
+              <p className="text-sm text-stone-600 font-sans mb-1">Tu puntuación acumulada fue:</p>
+              <div className="text-7xl font-extrabold text-stone-900 mb-6 font-sans">{score}</div>
+              <p className="text-sm text-amber-800 font-sans mb-1">Tu nota final (escala 1.0 a 5.0) es:</p>
+              <div className="text-9xl font-extrabold text-amber-600 border-b-8 border-amber-600 pb-2 px-4">{finalGrade}</div>
+            </div>
+
+            <div className="w-full max-w-md bg-white p-8 rounded-2xl border-2 border-stone-300 shadow-md flex flex-col gap-5 font-sans">
+              <h4 className="text-xl font-bold text-stone-900 mb-2">Ingresa tus datos para registrar la nota:</h4>
+              <div className="text-left w-full">
+                <label className="block text-sm font-semibold text-stone-700 mb-1">Curso:</label>
+                <select value={studentData.curso} onChange={e => setStudentData(d=>({...d, curso: e.target.value}))} className="w-full p-3 border-2 border-stone-300 rounded-lg text-lg">
+                  <option>11-1</option><option>11-2</option><option>11-3</option>
+                </select>
+              </div>
+              <div className="text-left w-full mb-4">
+                <label className="block text-sm font-semibold text-stone-700 mb-1">Documento de Identidad:</label>
+                <input type="number" value={studentData.documento} onChange={e => setStudentData(d=>({...d, documento: e.target.value}))} placeholder="Ejem: 12345678" className="w-full p-3 border-2 border-stone-300 rounded-lg text-lg"/>
+              </div>
+              <button onClick={submitGrade} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold text-xl py-5 rounded-2xl shadow-xl animate-pulse transition-all active:scale-95">
+                ¡SUBIR NOTA A LA PLANILLA! 🎓
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ESTADOS DE ENVÍO Y RESULTADO */}
+        {(gamePhase === 'enviando' || gamePhase === 'exito' || gamePhase === 'error') && (
+          <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 text-center font-sans">
+            <div className="bg-white p-12 rounded-3xl shadow-2xl max-w-lg">
+              {gamePhase === 'enviando' && <>
+                <div className="w-20 h-20 border-t-8 border-orange-600 border-solid rounded-full animate-spin mx-auto mb-6"></div>
+                <h3 className="text-2xl font-bold">Conectando con la planilla de notas...</h3>
+                <p className="mt-2 text-stone-600">Por favor espere.</p>
+              </>}
+              {gamePhase === 'exito' && <>
+                <div className="text-9xl mb-6">✅</div>
+                <h3 className="text-3xl font-bold text-green-700">¡NOTA REGISTRADA!</h3>
+                <p className="mt-4 text-xl text-stone-800">Se ha guardado <span className="font-bold">{finalGrade}</span> para el documento <span className="font-bold">{studentData.documento}</span> del curso <span className="font-bold">{studentData.curso}</span>.</p>
+                <p className="mt-6 text-stone-600 italic">¡Ya puedes cerrar este juego!</p>
+              </>}
+              {gamePhase === 'error' && <>
+                <div className="text-9xl mb-6">❌</div>
+                <h3 className="text-3xl font-bold text-red-700">ERROR</h3>
+                <p className="mt-4 text-xl text-stone-800">{errorMessage}</p>
+                <p className="mt-4 text-stone-700">Asegúrate de que tus datos son correctos.</p>
+                <button onClick={() => setGamePhase('final')} className="mt-8 bg-stone-700 text-white px-6 py-2 rounded-lg">Reintentar</button>
+              </>}
+            </div>
+          </div>
+        )}
+
+      </main>
+
+      {/* FOOTER */}
+      <footer className="bg-stone-900 text-stone-400 p-2 text-center text-xs z-10">
+        🏛️ Diseñado por Profe Danny - 2026 🎓
+      </footer>
+    </div>
+  );
+}
+
+export default App;
